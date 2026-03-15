@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DUAL — Tic Tac Toe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+/* ── CSS Custom Properties ─────────────────────────────────── */
+:root {
+  --bg:          #0c0d11;
+  --surface:     #13141a;
+  --surface-2:   #1c1e28;
+  --border:      rgba(255,255,255,0.07);
+  --border-glow: rgba(255,255,255,0.13);
+  --x-color:     #e8b84b;
+  --x-glow:      rgba(232,184,75,0.28);
+  --o-color:     #4bcce8;
+  --o-glow:      rgba(75,204,232,0.28);
+  --text-primary:   #f0f0f0;
+  --text-secondary: #6a6d7c;
+  --text-muted:     #3a3c47;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 24px;
+  --transition: 0.22s cubic-bezier(0.4,0,0.2,1);
+  --spring:     0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px}
+
+body {
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: 'DM Mono', monospace;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* ── Ambient Orbs ──────────────────────────────────────────── */
+.bg-orb {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(100px);
+  pointer-events: none;
+  z-index: 0;
+  animation: orb-drift 13s ease-in-out infinite alternate;
+}
+.orb-1 { width:500px;height:500px;background:var(--x-color);opacity:.14;top:-160px;left:-140px;animation-duration:15s; }
+.orb-2 { width:420px;height:420px;background:var(--o-color);opacity:.12;bottom:-130px;right:-110px;animation-delay:-6s; }
+
+@keyframes orb-drift {
+  from { transform:translate(0,0) scale(1); }
+  to   { transform:translate(40px,30px) scale(1.1); }
+}
+
+/* ── Wrapper ───────────────────────────────────────────────── */
+.wrapper {
+  position: relative;
+  z-index: 1;
+  width: min(500px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+  padding: 44px 0 52px;
+}
+
+/* ── Header ────────────────────────────────────────────────── */
+.header { text-align:center; }
+
+.title {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(3.2rem, 11vw, 5.5rem);
+  font-weight: 900;
+  letter-spacing: .2em;
+  line-height: 1;
+  background: linear-gradient(120deg, var(--x-color) 0%, #f8f8f8 48%, var(--o-color) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.subtitle {
+  font-size: .62rem;
+  letter-spacing: .38em;
+  color: var(--text-secondary);
+  margin-top: 7px;
+  text-transform: uppercase;
+}
+
+/* ── Scoreboard ────────────────────────────────────────────── */
+.scoreboard {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 22px;
+  box-shadow: 0 4px 40px rgba(0,0,0,.35);
+}
+
+.score-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  transition: var(--transition);
+}
+#score-x  { justify-content: flex-start; }
+#score-o  { justify-content: flex-end; }
+
+.score-card.active-player { filter: brightness(1.25); }
+
+.score-symbol {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.9rem;
+  font-weight: 700;
+  width: 46px; height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.x-symbol { color:var(--x-color); background:var(--x-glow); border:1px solid rgba(232,184,75,.3); }
+.o-symbol { color:var(--o-color); background:var(--o-glow); border:1px solid rgba(75,204,232,.3); }
+
+.score-info { display:flex;flex-direction:column;gap:2px; }
+.score-label { font-size:.56rem;letter-spacing:.14em;color:var(--text-secondary); }
+.score-value { font-size:1.65rem;font-weight:500;line-height:1;color:var(--text-primary);transition:var(--transition); }
+
+.score-divider { display:flex;flex-direction:column;align-items:center;gap:2px; }
+.draw-count    { font-size:1.3rem;font-weight:400;color:var(--text-secondary); }
+.draw-label    { font-size:.5rem;letter-spacing:.14em;color:var(--text-muted); }
+
+/* ── Turn Indicator ────────────────────────────────────────── */
+.turn-indicator { display:flex;flex-direction:column;align-items:center;gap:10px; }
+.turn-text { font-size:.73rem;letter-spacing:.13em;color:var(--text-secondary);transition:color var(--transition); }
+.turn-dots { display:flex;gap:8px; }
+.dot {
+  width:8px;height:8px;border-radius:50%;
+  background:var(--surface-2);
+  border:1px solid var(--border-glow);
+  transition:var(--spring);
+}
+.dot-x.active { background:var(--x-color);box-shadow:0 0 12px var(--x-glow);transform:scale(1.4); }
+.dot-o.active { background:var(--o-color);box-shadow:0 0 12px var(--o-glow);transform:scale(1.4); }
+
+/* ── Board Container ───────────────────────────────────────── */
+.board-container {
+  position: relative;
+  width: min(330px, calc(100vw - 64px));
+  aspect-ratio: 1;
+}
+
+.win-line-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 10;
+  overflow: visible;
+}
+
+#win-line {
+  stroke: var(--x-color);
+  stroke-width: 5;
+  stroke-linecap: round;
+  opacity: 0;
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  transition: stroke var(--transition), opacity .1s;
+  filter: drop-shadow(0 0 8px currentColor);
+}
+#win-line.animate {
+  opacity: 1;
+  animation: draw-line .55s cubic-bezier(.4,0,.2,1) forwards;
+}
+@keyframes draw-line { to { stroke-dashoffset: 0; } }
+
+/* ── Board Grid ────────────────────────────────────────────── */
+.board {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  grid-template-rows:    repeat(3,1fr);
+  gap: 10px;
+  width: 100%; height: 100%;
+}
+
+/* ── Cells ─────────────────────────────────────────────────── */
+.cell {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(2rem, 9vw, 3.4rem);
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    transform var(--spring),
+    box-shadow var(--transition),
+    opacity 0.4s ease;
+}
+
+.cell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #fff;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.cell:hover:not(.taken)          { background:var(--surface-2);border-color:var(--border-glow);transform:scale(1.05); }
+.cell:hover:not(.taken)::after   { opacity:.04; }
+.cell:active:not(.taken)         { transform:scale(0.93); }
+
+.cell.x-mark {
+  color: var(--x-color);
+  border-color: rgba(232,184,75,.22);
+  background: rgba(232,184,75,.05);
+  text-shadow: 0 0 30px var(--x-glow);
+  cursor: default;
+}
+.cell.o-mark {
+  color: var(--o-color);
+  border-color: rgba(75,204,232,.22);
+  background: rgba(75,204,232,.05);
+  text-shadow: 0 0 30px var(--o-glow);
+  cursor: default;
+}
+.cell.taken { cursor:default; }
+
+/* Pop-in on mark placed */
+.cell.pop-in { animation: pop-in var(--spring) both; }
+@keyframes pop-in {
+  0%   { transform:scale(.3) rotate(-12deg); opacity:0; }
+  70%  { transform:scale(1.15) rotate(4deg); }
+  100% { transform:scale(1) rotate(0deg); opacity:1; }
+}
+
+/* Winner cell pulse */
+.cell.winner-cell { animation: winner-pulse .65s var(--spring) both; }
+@keyframes winner-pulse {
+  0%   { transform:scale(1); }
+  50%  { transform:scale(1.12); }
+  100% { transform:scale(1); }
+}
+.cell.winner-cell.x-mark { box-shadow:0 0 28px var(--x-glow);background:rgba(232,184,75,.12); }
+.cell.winner-cell.o-mark { box-shadow:0 0 28px var(--o-glow);background:rgba(75,204,232,.12); }
+
+/* Non-winner fade-dim */
+.board.game-over .cell:not(.winner-cell) { opacity:.28;transform:scale(.96); }
+
+/* ── Status Banner ─────────────────────────────────────────── */
+.status-banner { min-height:38px;display:flex;align-items:center;justify-content:center; }
+#status-msg {
+  font-size: .78rem;
+  letter-spacing: .18em;
+  color: var(--text-secondary);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity .35s ease, transform .35s ease;
+  text-align: center;
+}
+#status-msg.visible { opacity:1;transform:translateY(0); }
+
+/* ── Controls ──────────────────────────────────────────────── */
+.controls { display:flex;gap:12px;flex-wrap:wrap;justify-content:center; }
+
+.btn {
+  font-family: 'DM Mono', monospace;
+  font-size: .7rem;
+  letter-spacing: .1em;
+  padding: 12px 26px;
+  border-radius: 999px;
+  border: 1px solid var(--border-glow);
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-reset { background:var(--surface);color:var(--text-primary); }
+.btn-reset:hover {
+  background: var(--surface-2);
+  border-color: rgba(255,255,255,.22);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.45);
+}
+.btn-reset:active { transform:translateY(0); }
+
+.btn-clear { background:transparent;color:var(--text-secondary); }
+.btn-clear:hover { color:var(--text-primary);border-color:rgba(255,255,255,.16);transform:translateY(-2px); }
+.btn-clear:active { transform:translateY(0); }
+
+/* Score bump */
+@keyframes score-bump {
+  0%   { transform:scale(1); }
+  40%  { transform:scale(1.5); }
+  100% { transform:scale(1); }
+}
+.score-bump { animation:score-bump .45s var(--spring) both; }
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media(max-width:380px){
+  .wrapper          { gap:18px;padding:28px 0 36px; }
+  .scoreboard       { padding:14px 14px;gap:8px; }
+  .score-symbol     { width:38px;height:38px;font-size:1.5rem; }
+  .score-value      { font-size:1.3rem; }
+  .btn              { padding:10px 18px;font-size:.64rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-orb orb-1"></div>
+<div class="bg-orb orb-2"></div>
+
+<div class="wrapper">
+
+  <!-- Header -->
+  <header class="header">
+    <h1 class="title">DUAL</h1>
+    <p class="subtitle">Tic · Tac · Toe</p>
+  </header>
+
+  <!-- Scoreboard -->
+  <div class="scoreboard">
+    <div class="score-card" id="score-x">
+      <span class="score-symbol x-symbol">X</span>
+      <div class="score-info">
+        <span class="score-label">PLAYER ONE</span>
+        <span class="score-value" id="score-x-val">0</span>
+      </div>
+    </div>
+
+    <div class="score-divider">
+      <span class="draw-count" id="score-draw">0</span>
+      <span class="draw-label">DRAWS</span>
+    </div>
+
+    <div class="score-card" id="score-o">
+      <div class="score-info" style="text-align:right">
+        <span class="score-label">PLAYER TWO</span>
+        <span class="score-value" id="score-o-val">0</span>
+      </div>
+      <span class="score-symbol o-symbol">O</span>
+    </div>
+  </div>
+
+  <!-- Turn Indicator -->
+  <div class="turn-indicator">
+    <span class="turn-text" id="turn-text">Player X's Turn</span>
+    <div class="turn-dots">
+      <span class="dot dot-x active" id="dot-x"></span>
+      <span class="dot dot-o" id="dot-o"></span>
+    </div>
+  </div>
+
+  <!-- Board -->
+  <div class="board-container">
+    <svg class="win-line-svg" id="win-svg" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+      <line id="win-line" x1="0" y1="0" x2="0" y2="0"/>
+    </svg>
+    <div class="board" id="board" role="grid" aria-label="Tic Tac Toe board"></div>
+  </div>
+
+  <!-- Status -->
+  <div class="status-banner" aria-live="polite">
+    <span id="status-msg"></span>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn btn-reset" id="reset-btn">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+      </svg>
+      Reset Game
+    </button>
+    <button class="btn btn-clear" id="clear-btn">Clear Scores</button>
+  </div>
+
+</div><!-- /.wrapper -->
+
+<script>
+/* ── Audio Engine ──────────────────────────────────────────── */
+const AudioEngine = (() => {
+  let ctx = null;
+  const getCtx = () => {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    return ctx;
+  };
+  const tone = (freq, type, dur, gain) => {
+    try {
+      const ac = getCtx(), osc = ac.createOscillator(), env = ac.createGain();
+      osc.connect(env); env.connect(ac.destination);
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, ac.currentTime);
+      env.gain.setValueAtTime(0, ac.currentTime);
+      env.gain.linearRampToValueAtTime(gain, ac.currentTime + .012);
+      env.gain.exponentialRampToValueAtTime(.001, ac.currentTime + dur);
+      osc.start(ac.currentTime); osc.stop(ac.currentTime + dur);
+    } catch(e){}
+  };
+  return {
+    placeX() { tone(680,'triangle',.1,.16); setTimeout(()=>tone(900,'triangle',.08,.09),55); },
+    placeO() { tone(530,'sine',.1,.16); setTimeout(()=>tone(720,'sine',.08,.09),55); },
+    win()    { [523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,'triangle',.22,.2),i*85)); },
+    draw()   { [392,330,294].forEach((f,i)=>setTimeout(()=>tone(f,'sawtooth',.18,.1),i*90)); }
+  };
+})();
+
+/* ── Win Combos ────────────────────────────────────────────── */
+const WIN_COMBOS = [
+  [0,1,2],[3,4,5],[6,7,8],
+  [0,3,6],[1,4,7],[2,5,8],
+  [0,4,8],[2,4,6]
+];
+
+const checkWinner = board => {
+  for (const c of WIN_COMBOS) {
+    const [a,b,d] = c;
+    if (board[a] && board[a]===board[b] && board[a]===board[d])
+      return { player: board[a], combo: c };
+  }
+  return null;
+};
+
+const isFull = board => board.every(c => c !== '');
+
+const lineCoords = combo => {
+  const xy = i => ({ x: (i%3)*100+50, y: Math.floor(i/3)*100+50 });
+  const s = xy(combo[0]), e = xy(combo[2]);
+  return { x1:s.x, y1:s.y, x2:e.x, y2:e.y };
+};
+
+/* ── Game State ────────────────────────────────────────────── */
+const Game = (() => {
+  let board = Array(9).fill(''), current = 'X', over = false;
+  let scores = { X:0, O:0, draws:0 };
+  return {
+    get: () => ({ board:[...board], current, over, scores:{...scores} }),
+    play(idx) {
+      if (over || board[idx]) return { ok:false };
+      board[idx] = current;
+      const w = checkWinner(board);
+      if (w) { over=true; scores[w.player]++; return { ok:true, result:'win', player:w.player, combo:w.combo }; }
+      if (isFull(board)) { over=true; scores.draws++; return { ok:true, result:'draw' }; }
+      current = current==='X' ? 'O' : 'X';
+      return { ok:true, result:'continue' };
+    },
+    reset()       { board=Array(9).fill(''); current='X'; over=false; },
+    clearScores() { scores={X:0,O:0,draws:0}; }
+  };
+})();
+
+/* ── UI ────────────────────────────────────────────────────── */
+const boardEl    = document.getElementById('board');
+const winLine    = document.getElementById('win-line');
+const turnText   = document.getElementById('turn-text');
+const dotX       = document.getElementById('dot-x');
+const dotO       = document.getElementById('dot-o');
+const statusMsg  = document.getElementById('status-msg');
+const scoreXEl   = document.getElementById('score-x-val');
+const scoreOEl   = document.getElementById('score-o-val');
+const drawEl     = document.getElementById('score-draw');
+const scoreXCard = document.getElementById('score-x');
+const scoreOCard = document.getElementById('score-o');
+
+let cells = [];
+
+function buildBoard() {
+  boardEl.innerHTML = '';
+  cells = [];
+  for (let i = 0; i < 9; i++) {
+    const c = document.createElement('div');
+    c.className = 'cell';
+    c.setAttribute('role','gridcell');
+    c.dataset.index = i;
+    boardEl.appendChild(c);
+    cells.push(c);
+  }
+}
+
+function renderMark(idx, player) {
+  const c = cells[idx];
+  c.textContent = player;
+  c.classList.add(player==='X' ? 'x-mark' : 'o-mark', 'taken', 'pop-in');
+  c.addEventListener('animationend', () => c.classList.remove('pop-in'), { once:true });
+}
+
+function setTurn(player) {
+  turnText.textContent = `Player ${player}'s Turn`;
+  dotX.classList.toggle('active', player==='X');
+  dotO.classList.toggle('active', player==='O');
+  scoreXCard.classList.toggle('active-player', player==='X');
+  scoreOCard.classList.toggle('active-player', player==='O');
+}
+
+function showStatus(msg) {
+  statusMsg.textContent = msg;
+  statusMsg.classList.add('visible');
+}
+
+function drawWinLine(combo, player) {
+  cells.forEach((c,i) => { if (combo.includes(i)) c.classList.add('winner-cell'); });
+  boardEl.classList.add('game-over');
+  const {x1,y1,x2,y2} = lineCoords(combo);
+  winLine.setAttribute('x1',x1); winLine.setAttribute('y1',y1);
+  winLine.setAttribute('x2',x2); winLine.setAttribute('y2',y2);
+  winLine.style.stroke = player==='X' ? 'var(--x-color)' : 'var(--o-color)';
+  requestAnimationFrame(() => requestAnimationFrame(() => winLine.classList.add('animate')));
+}
+
+function updateScores(scores) {
+  const bump = el => { el.classList.remove('score-bump'); void el.offsetWidth; el.classList.add('score-bump'); };
+  if (scoreXEl.textContent !== String(scores.X)) { scoreXEl.textContent = scores.X; bump(scoreXEl); }
+  if (scoreOEl.textContent !== String(scores.O)) { scoreOEl.textContent = scores.O; bump(scoreOEl); }
+  drawEl.textContent = scores.draws;
+}
+
+function resetBoard() {
+  cells.forEach((c,i) => { c.className='cell'; c.textContent=''; });
+  boardEl.classList.remove('game-over');
+  winLine.classList.remove('animate');
+  winLine.setAttribute('x1',0); winLine.setAttribute('y1',0);
+  winLine.setAttribute('x2',0); winLine.setAttribute('y2',0);
+  statusMsg.classList.remove('visible');
+  setTurn('X');
+}
+
+/* ── Init & Events ─────────────────────────────────────────── */
+buildBoard();
+setTurn('X');
+
+boardEl.addEventListener('click', e => {
+  const cell = e.target.closest('.cell');
+  if (!cell) return;
+  const idx    = Number(cell.dataset.index);
+  const before = Game.get().current;
+  const result = Game.play(idx);
+  if (!result.ok) return;
+
+  renderMark(idx, before);
+
+  if (result.result === 'continue') {
+    before==='X' ? AudioEngine.placeX() : AudioEngine.placeO();
+    setTurn(Game.get().current);
+  } else {
+    before==='X' ? AudioEngine.placeX() : AudioEngine.placeO();
+    setTimeout(() => {
+      if (result.result === 'win') {
+        drawWinLine(result.combo, result.player);
+        showStatus(`✦  PLAYER ${result.player}  WINS  ✦`);
+        AudioEngine.win();
+      } else {
+        boardEl.classList.add('game-over');
+        showStatus('—  IT\'S A DRAW  —');
+        AudioEngine.draw();
+      }
+      updateScores(Game.get().scores);
+    }, 130);
+  }
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => { Game.reset(); resetBoard(); });
+document.getElementById('clear-btn').addEventListener('click', () => {
+  Game.reset(); Game.clearScores();
+  resetBoard(); updateScores(Game.get().scores);
+});
+</script>
+</body>
+</html>
